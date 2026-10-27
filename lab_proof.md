@@ -15,6 +15,14 @@ query
   ▼ gpt-4o-mini, temperature 0, "answer only from context, cite [source, page, article]"
 answer + the chunks used
 ```
+| Item | Value |
+|---|---|
+| Chunks | 784 (20 podcast, 764 EU AI Act), 1000 characters, 150 overlap |
+| Metadata (after rebuild) | `source_type`, `source_name`, `chunk_id`, `page`, `section` (recital / article / annex / transcript), `chapter`, `article`, `annex`, `char_start` |
+| Switch baseline → reranked | one argument: `answer(q)` vs `answer(q, retrieve_fn=llm_rerank)` |
+| Run | `pip install -r requirements.txt`, add `.env` with `OPENAI_API_KEY` and `PINECONE_API_KEY`, run the notebook top to bottom |
+| Demo UI | `python app.py` |
+
 
 ## 1b. Process map (end to end)
 
@@ -92,14 +100,6 @@ flowchart LR
 | Reviewer view | Show the answer, citation trace, evidence scores and ranks, full chunk text, elapsed time, and LLM call count. | `app.py`: `run_question`, `show_selected_chunk` |
 
 
-
-| Item | Value |
-|---|---|
-| Chunks | 784 (20 podcast, 764 EU AI Act), 1000 characters, 150 overlap |
-| Metadata (after rebuild) | `source_type`, `source_name`, `chunk_id`, `page`, `section` (recital / article / annex / transcript), `chapter`, `article`, `annex`, `char_start` |
-| Switch baseline → reranked | one argument: `answer(q)` vs `answer(q, retrieve_fn=llm_rerank)` |
-| Run | `pip install -r requirements.txt`, add `.env` with `OPENAI_API_KEY` and `PINECONE_API_KEY`, run the notebook top to bottom |
-| Demo UI | `python app.py` |
 
 ## 2. Query
 
