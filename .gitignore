@@ -1,0 +1,11 @@
+# secrets
+.env
+# local environments and caches
+.venv/
+venv/
+__pycache__/
+.ipynb_checkpoints/
+# workbench notebooks, reference copy and backups (local only)
+workbench_*.ipynb
+*_reference.ipynb
+backups/

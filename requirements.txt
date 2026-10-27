@@ -1,0 +1,9 @@
+python-dotenv
+pypdf
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain-openai
+pinecone
+langchain-pinecone
+ipykernel
