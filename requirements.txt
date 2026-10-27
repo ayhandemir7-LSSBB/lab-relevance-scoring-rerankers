@@ -7,3 +7,4 @@ langchain-openai
 pinecone
 langchain-pinecone
 ipykernel
+gradio

@@ -4,7 +4,7 @@
 
 ## 1. What I built
 
-A small, traceable RAG pipeline over two sources: a Trustworthy AI podcast transcript (the 2019 HLEG Ethics Guidelines) and the EU AI Act (Reg. 2024/1689, 144 pages). I built a baseline vector search, used an **LLM relevance score as my reranker** (Step 3), added **metadata filtering** with a rebuilt schema (Step 5), and plugged both into a RAG chain that **cites its sources** (Step 6). Then I evaluated 5 test queries by hand (Step 7).
+A small, traceable RAG pipeline over two sources: a Trustworthy AI podcast transcript (the 2019 HLEG Ethics Guidelines) and the EU AI Act (Reg. 2024/1689, 144 pages). I built a baseline vector search, used an **LLM relevance score as my reranker** (Step 3), added **metadata filtering** with a rebuilt schema (Step 5), and plugged both into a RAG chain that **cites its sources** (Step 6). Then I evaluated 5 test queries by hand (Step 7). I also built a small local Gradio app (`app.py`) to inspect sources and answers.
 
 ```
 query
@@ -16,12 +16,90 @@ query
 answer + the chunks used
 ```
 
+## 1b. Process map (end to end)
+
+How the lab works from raw sources to what the reviewer sees: build once in the notebook, then every question in the app runs retrieve, answer, view.
+
+```mermaid
+flowchart LR
+    subgraph BUILD["🛠️ 1 · Build once (notebook)"]
+        direction TB
+        A1["📄 Sources<br/>podcast + EU AI Act"] --> A2["✂️ Chunk<br/>1000 / 150"]
+        A2 --> A3["🏷️ Metadata<br/>section · article · page"]
+        A3 --> A4["🔢 Embed<br/>text-embedding-3-small"]
+        A4 --> A5[("🗄️ Pinecone<br/>784 vectors")]
+    end
+
+    subgraph RETRIEVE["🔍 2 · Retrieve (app)"]
+        direction TB
+        B1(["🙋 Question<br/>+ method · filters"]) --> B2["🎯 Metadata filter<br/>WHERE"]
+        B2 --> B3["Vector search<br/>cosine"]
+        B3 --> B4{"Method"}
+        B4 -- "Baseline" --> B5["Top 5<br/>by similarity"]
+        B4 -- "Reranked" --> B6["🤖 LLM scores top 10<br/>0.3 sim + 0.7 LLM"]
+        B6 --> B7["Top 5<br/>WHICH"]
+    end
+
+    subgraph ANSWER["💬 3 · Answer (app)"]
+        direction TB
+        C1["🧩 Context<br/>with source labels"] --> C2["gpt-4o-mini<br/>only from context"]
+        C2 --> C3["✅ Answer + citations"]
+        C2 -.-> C4["🚫 I don't know<br/>based on the sources"]
+    end
+
+    subgraph VIEW["👀 4 · Reviewer view"]
+        direction TB
+        D1["Answer card"] --> D2["Evidence table<br/>scores · rank"]
+        D2 --> D3["Chunk inspector<br/>full text + metadata"]
+        D3 --> D4["⏱️ time · LLM calls"]
+    end
+
+    A5 -. "read-only" .-> B3
+    B5 --> C1
+    B7 --> C1
+    C3 --> D1
+    C4 --> D1
+
+    classDef build fill:#E8F1FB,stroke:#4A7FC1,color:#1B3A5C
+    classDef store fill:#D6E6F8,stroke:#2F5F99,color:#14304F,stroke-width:2px
+    classDef step fill:#EEF7EE,stroke:#4E9A5A,color:#1E4024
+    classDef llm fill:#FFF4E0,stroke:#D18A1E,color:#5A3A00
+    classDef decision fill:#F3EEFB,stroke:#7B5BB5,color:#33204F
+    classDef good fill:#E3F4E6,stroke:#2E7D3E,color:#14401E,stroke-width:2px
+    classDef warn fill:#FDEDEF,stroke:#C2546A,color:#5A1E2A
+    classDef view fill:#F5F5F7,stroke:#8A8A99,color:#2A2A35
+
+    class A1,A2,A3,A4 build
+    class A5 store
+    class B1,B2,B3,B5,B7,C1 step
+    class B6,C2 llm
+    class B4 decision
+    class C3 good
+    class C4 warn
+    class D1,D2,D3,D4 view
+
+    style BUILD fill:#FAFCFF,stroke:#B9CCE6,stroke-width:1px
+    style RETRIEVE fill:#FAFDFA,stroke:#BCD9C1,stroke-width:1px
+    style ANSWER fill:#FFFDF8,stroke:#EBD3A8,stroke-width:1px
+    style VIEW fill:#FBFBFC,stroke:#D0D0DA,stroke-width:1px
+```
+
+| Lane | What happens | Where in the code (notebook step or app.py function) |
+|---|---|---|
+| Build once | Load both sources, chunk them with metadata, embed them, and upload 784 vectors. | Notebook Steps 1, 2, and 5 |
+| Retrieve | Apply optional metadata filters, search by cosine similarity, then optionally rerank the top 10 into the top 5. | `app.py`: `build_filter`, `baseline_search`, `llm_rerank` |
+| Answer | Put source labels into the context and answer from that context with citations or the out-of-scope response. | `app.py`: `format_context`, `rag_prompt`, `answer` |
+| Reviewer view | Show the answer, citation trace, evidence scores and ranks, full chunk text, elapsed time, and LLM call count. | `app.py`: `run_question`, `show_selected_chunk` |
+
+
+
 | Item | Value |
 |---|---|
 | Chunks | 784 (20 podcast, 764 EU AI Act), 1000 characters, 150 overlap |
 | Metadata (after rebuild) | `source_type`, `source_name`, `chunk_id`, `page`, `section` (recital / article / annex / transcript), `chapter`, `article`, `annex`, `char_start` |
 | Switch baseline → reranked | one argument: `answer(q)` vs `answer(q, retrieve_fn=llm_rerank)` |
 | Run | `pip install -r requirements.txt`, add `.env` with `OPENAI_API_KEY` and `PINECONE_API_KEY`, run the notebook top to bottom |
+| Demo UI | `python app.py` |
 
 ## 2. Query
 
@@ -104,3 +182,12 @@ It sounds right and carries a citation, but the source says the opposite of what
 **Other limitations I saw:**
 - **LLM scores are not fully stable, even at temperature 0:** `regulation-58` scored 0.5 in one run and 0.6 in the next, which changed its rank (#6 → #5).
 
+## 8. Demo UI (optional stretch)
+
+- I can switch between baseline retrieval and LLM reranking, then filter by source and article.
+- The evidence table shows similarity, LLM and combined scores, plus rank movement for each chunk.
+- I can inspect a chunk's full text and metadata, and see the time and LLM calls for each question.
+- The app runs locally only and reads the existing index without writing to it. I did not deploy it because a public URL could expose paid API usage.
+
+for UI, run command in terminal: python app.py
+then copy and paste the given link to your web browser.

@@ -13,7 +13,7 @@ Fill in the instructor's starter notebook `relevance_scoring_rerankers.ipynb` (S
 | `relevance_scoring_rerankers.ipynb` | Instructor template: PROVIDED / YOUR TURN / OPTIONAL cells, "Done when" checks, `lab_proof.md` template |
 | `data/podcast.txt` | One transcript, about 16k characters, no pages or episodes |
 | `data/eu_ai_act.pdf` | Reg. 2024/1689, 144 pages: recitals p.1 to 43, Articles 1 to 113 p.44 to 123 (CHAPTER I to XIII), Annexes I to XIII p.124 to 144 |
-| Training: `rag_intro.ipynb`, `rag_pipeline.ipynb`, `rag_openai.ipynb` | Code patterns to reuse |
+|
 
 ## 3. Musts
 | ID | Must | Template step | Rubric lines |
@@ -40,71 +40,97 @@ query
 answer + the chunks used
 ```
 
+## 4b. Process map (end to end)
+
+How the lab works from raw sources to what the reviewer sees: build once in the notebook, then every question in the app runs retrieve, answer, view.
+
+```mermaid
+flowchart LR
+    subgraph BUILD["🛠️ 1 · Build once (notebook)"]
+        direction TB
+        A1["📄 Sources<br/>podcast + EU AI Act"] --> A2["✂️ Chunk<br/>1000 / 150"]
+        A2 --> A3["🏷️ Metadata<br/>section · article · page"]
+        A3 --> A4["🔢 Embed<br/>text-embedding-3-small"]
+        A4 --> A5[("🗄️ Pinecone<br/>784 vectors")]
+    end
+
+    subgraph RETRIEVE["🔍 2 · Retrieve (app)"]
+        direction TB
+        B1(["🙋 Question<br/>+ method · filters"]) --> B2["🎯 Metadata filter<br/>WHERE"]
+        B2 --> B3["Vector search<br/>cosine"]
+        B3 --> B4{"Method"}
+        B4 -- "Baseline" --> B5["Top 5<br/>by similarity"]
+        B4 -- "Reranked" --> B6["🤖 LLM scores top 10<br/>0.3 sim + 0.7 LLM"]
+        B6 --> B7["Top 5<br/>WHICH"]
+    end
+
+    subgraph ANSWER["💬 3 · Answer (app)"]
+        direction TB
+        C1["🧩 Context<br/>with source labels"] --> C2["gpt-4o-mini<br/>only from context"]
+        C2 --> C3["✅ Answer + citations"]
+        C2 -.-> C4["🚫 I don't know<br/>based on the sources"]
+    end
+
+    subgraph VIEW["👀 4 · Reviewer view"]
+        direction TB
+        D1["Answer card"] --> D2["Evidence table<br/>scores · rank"]
+        D2 --> D3["Chunk inspector<br/>full text + metadata"]
+        D3 --> D4["⏱️ time · LLM calls"]
+    end
+
+    A5 -. "read-only" .-> B3
+    B5 --> C1
+    B7 --> C1
+    C3 --> D1
+    C4 --> D1
+
+    classDef build fill:#E8F1FB,stroke:#4A7FC1,color:#1B3A5C
+    classDef store fill:#D6E6F8,stroke:#2F5F99,color:#14304F,stroke-width:2px
+    classDef step fill:#EEF7EE,stroke:#4E9A5A,color:#1E4024
+    classDef llm fill:#FFF4E0,stroke:#D18A1E,color:#5A3A00
+    classDef decision fill:#F3EEFB,stroke:#7B5BB5,color:#33204F
+    classDef good fill:#E3F4E6,stroke:#2E7D3E,color:#14401E,stroke-width:2px
+    classDef warn fill:#FDEDEF,stroke:#C2546A,color:#5A1E2A
+    classDef view fill:#F5F5F7,stroke:#8A8A99,color:#2A2A35
+
+    class A1,A2,A3,A4 build
+    class A5 store
+    class B1,B2,B3,B5,B7,C1 step
+    class B6,C2 llm
+    class B4 decision
+    class C3 good
+    class C4 warn
+    class D1,D2,D3,D4 view
+
+    style BUILD fill:#FAFCFF,stroke:#B9CCE6,stroke-width:1px
+    style RETRIEVE fill:#FAFDFA,stroke:#BCD9C1,stroke-width:1px
+    style ANSWER fill:#FFFDF8,stroke:#EBD3A8,stroke-width:1px
+    style VIEW fill:#FBFBFC,stroke:#D0D0DA,stroke-width:1px
+```
+
+| Lane | What happens | Where in the code (notebook step or app.py function) |
+|---|---|---|
+| Build once | Load both sources, chunk them with metadata, embed them, and upload 784 vectors. | Notebook Steps 1, 2, and 5 |
+| Retrieve | Apply optional metadata filters, search by cosine similarity, then optionally rerank the top 10 into the top 5. | `app.py`: `build_filter`, `baseline_search`, `llm_rerank` |
+| Answer | Put source labels into the context and answer from that context with citations or the out-of-scope response. | `app.py`: `format_context`, `rag_prompt`, `answer` |
+| Reviewer view | Show the answer, citation trace, evidence scores and ranks, full chunk text, elapsed time, and LLM call count. | `app.py`: `run_question`, `show_selected_chunk` |
+
 ## 5. Cards
-| ID | Card | Template step | Must | Backup |
-|---|---|---|---|---|
-| L0 | Setup | Step 0 | M8 | |
-| L1 | Load, chunk with metadata, test embedding | Step 1 (1d) | M1 | |
-| L2 | Pinecone index + baseline retrieval | Step 2 | M2 | |
-| L3 | LLM relevance scoring | Step 3 | M3 | yes |
-| L5 | Metadata filtering + v2 schema + index rebuild | Step 5 | M4 | yes |
-| L6 | RAG pipeline with citations | Step 6 | M5 | yes |
-| L7 | Evaluation with vs without reranking | Step 7 | M6 | |
-| L8 | `lab_proof.md` + sanity check | Step 8 | M7, M8 | |
+| ID | Card | Template step | Must | 
+|---|---|---|---|
+| L0 | Setup | Step 0 | M8 |
+| L1 | Load, chunk with metadata, test embedding | Step 1 (1d) | M1 |
+| L2 | Pinecone index + baseline retrieval | Step 2 | M2 |
+| L3 | LLM relevance scoring | Step 3 | M3 |
+| L5 | Metadata filtering + v2 schema + index rebuild | Step 5 | M4 |
+| L6 | RAG pipeline with citations | Step 6 | M5 |
+| L7 | Evaluation with vs without reranking | Step 7 | M6 |
+| L8 | `lab_proof.md` + sanity check | Step 8 | M7, M8 |
+| UI | Gradio demo app | Optional stretch | optional stretch |
 
-### L0 Setup (Step 0)
-- **Creates:** `requirements.txt` (the template's pip list), `.env.example` (2 key names), `.gitignore` (`.env`, `workbench_*.ipynb`, `backups/`, `__pycache__/`, `.ipynb_checkpoints/`, `*_reference.ipynb`).
-- **Manual (Ayhan):** copy the template notebook and `data/` files into the repo root, create the environment and `.env`.
-- **Checks:** both keys load (True/False only) · both data files exist · all imports work.
-
-### L1 Load, chunk, embed test (Step 1)
-- **Fill:** 1d: `embeddings = OpenAIEmbeddings(model="text-embedding-3-small")`, embed `all_chunks[0]`.
-- **Checks:** podcast and regulation chunk counts > 0 · every chunk has `source_type`, `source_name`, `chunk_id` · vector length 1536.
-
-### L2 Baseline retrieval (Step 2)
-- **Fill:** create `lab-rerankers` if missing (1536, cosine) · `PineconeVectorStore.from_documents(..., ids=chunk_ids)` · `baseline_search(query, k=5)` with `similarity_search_with_score` · store and print `baseline_results` for each test query.
-- **Checks:** index vector count equals `len(all_chunks)` · 5 results per query, each with score, source and page/chunk_id.
-- **Note down:** one query where the top result is wrong or half-relevant.
-
-### L3 LLM relevance scoring (Step 3)
-- **Fill:** `llm_relevance_score(query, doc)` from `rerank_documents` in `rag_pipeline.ipynb`, with a "reply with only a number" prompt and a safe float parse (fallback 0.5 as in the training code, clamp 0 to 1) · `llm_rerank(query, k_initial=10, k_final=5, w_sim=0.3, w_llm=0.7)` returns `(doc, combined)` · baseline vs LLM top 3 side by side for 2+ queries · count LLM calls.
-- **Checks:** scores are floats in 0 to 1 · 5 results returned · reranked ids ⊂ baseline top 10 · at least one query where the order changed, or an honest "none".
-
-### L5 Metadata filtering (Step 5)
-- **Fill:** `filter={"source_type": {"$eq": ...}}` for regulation vs podcast on one query · show that `section` / `article` filters don't work yet · `chunk_with_metadata_v2` adds `section`, `chapter`, `article`, `annex` (regex on heading lines, carried forward chunk to chunk) and podcast `char_start` · delete the index, recreate it, re-upload, rebind `vectorstore` · filter on `{"article": {"$eq": "Article 5"}}` and `{"section": {"$eq": "article"}}`.
-- **Checks:** every returned chunk matches its filter · 112+ of 113 articles tagged · no `None` metadata values · the new index count equals the new chunk count.
-- **Known limit:** a chunk spanning two articles is tagged with the first heading.
-
-### L6 RAG pipeline (Step 6)
-- **Fill:** `format_context(results)` with `[source, p.X, Article N]` or `[source, chunk_id]` prefixes · `rag_prompt`: context only, cite, admit "I don't know based on the sources" · `answer(query, retrieve_fn=baseline_search)` returns `(answer_text, results)` · switching to `llm_rerank` is the only change · optional filtered retriever, e.g. regulation only.
-- **Checks:** both methods return an answer with at least one citation · an out-of-scope question gets "I don't know".
-
-### L7 Evaluation (Step 7)
-- **Fill:** loop over `TEST_QUERIES`, time `answer(q, baseline_search)` vs `answer(q, llm_rerank)`, print both answers and the top 3 sources · fill the evaluation table skeleton with `[Ayhan]` cells · show the LLM-call count and seconds per query.
-- **Checks:** one row per query and method · no verdict filled in by code.
-
-### L8 lab_proof + sanity check (Step 8)
-- **Creates:** `lab_proof_draft.md` from the template's 7 sections, filled with real outputs from one chosen query (evidence table, answer, trace); Ayhan reviews and renames to `lab_proof.md`.
-- **Checks:** `.env` not tracked · no key patterns in tracked files or notebook outputs · only lab files in the repo · the lab notebook runs top to bottom.
-- **Limitation candidates:** a chunk spanning two articles tagged wrong · the LLM score varies with prompt wording · the podcast paraphrases the 2019 guidelines, so a mixed-source answer can sound right but be unsupported by the Act.
 
 ## 6. Working rules (summary; full rules in `agents.md`)
 **Stack:** OpenAI `gpt-4o-mini` + `text-embedding-3-small`, Pinecone `lab-rerankers`, LangChain (core, community, text-splitters, openai, pinecone), pypdf, python-dotenv. Codex in VS Code.
 
-**Card prompt (written in Claude chat):**
-```
-Read agents.md first and follow all its rules. Card: <ID> <name> (<Must>).
-Template step: <Step n>. Read: project_structure.md §<card>, relevance_scoring_rerankers.ipynb, <training notebook>.
-Don't touch: every file except workbench_<ID>.ipynb.
-Build the workbench, fill the TODO cells for this step, add PASS/FAIL checks. Don't commit.
-End with a short report: what was built, which cells go where, any risk.
-```
-
-**Do:** reuse training and template code · keep template names and parameters · explain each step in markdown · cite sources in every answer · backups on L3, L5, L6.
-
-**Never:** git commands · edit repo files directly · Cohere or sentence-transformers · new packages or features · keys in code or outputs · invented verdicts or scores.
-
-**Definition of Done:** checks PASS · the lab notebook runs top to bottom from a clean kernel · no secrets · Ayhan commits.
-
 ## 7. Parked (won't do)
-Step 4 dedicated reranker (Cohere or cross-encoder) · query rewriting, HyDE, sub-query, step-back · hybrid BM25 · score threshold instead of fixed k · demo UI.
+Step 4 dedicated reranker (Cohere or cross-encoder) · query rewriting, HyDE, sub-query, step-back · hybrid BM25 · score threshold instead of fixed k.

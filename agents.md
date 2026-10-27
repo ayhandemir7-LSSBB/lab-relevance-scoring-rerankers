@@ -17,13 +17,14 @@ Show that LLM relevance scoring and metadata filtering pick the *right* chunk, n
 | Vector store | Pinecone serverless, aws `us-east-1`, cosine, index `lab-rerankers` |
 | Framework | `langchain-core`, `langchain-community` (`PyPDFLoader`, `TextLoader`), `langchain-text-splitters`, `langchain-openai`, `langchain-pinecone`, `pinecone` (not `pinecone-client`) |
 | Other | `pypdf`, `python-dotenv` |
+| UI | Gradio (local only) |
 | Secrets | `.env`: `OPENAI_API_KEY`, `PINECONE_API_KEY` |
 
 No Cohere, no sentence-transformers (Step 4 is parked). The `langchain-community` deprecation warning is expected; ignore it.
 
 ## 3. Setup
 ```bash
-pip install -r requirements.txt    # inside Ayhan's own environment
+pip install -r requirements.txt    
 ```
 `.env` sits next to the notebook. Data sits in `data/`. Run the lab notebook top to bottom from a clean kernel.
 
@@ -34,13 +35,11 @@ lab-relevance-scoring-rerankers/
 ├── agents.md                                 # this file
 ├── project_structure.md                      # cards, Musts, checks
 ├── relevance_scoring_rerankers.ipynb         # THE lab notebook (instructor template, Ayhan pastes cells in)
-├── lab_proof.md                              # reviewer entry point (Ayhan finalises from lab_proof_draft.md)
+├── app.py                                    # local Gradio evidence viewer
 ├── requirements.txt
 ├── .env.example                              # key names only
 ├── .gitignore
 ├── data/podcast.txt, data/eu_ai_act.pdf
-├── backups/                                  # git-ignored
-└── workbench_<ID>.ipynb                      # git-ignored, one per card, Ayhan deletes before commit
 ```
 `relevance_scoring_rerankers_reference.ipynb` (Claude's reference) may sit in the folder. Never read or copy it unless the prompt says so.
 
@@ -51,23 +50,16 @@ lab-relevance-scoring-rerankers/
    1. **Folder check**: repo root, `data/` files exist (PASS/FAIL).
    2. **Backup cell**, only on cards L3, L5, L6: copy `relevance_scoring_rerankers.ipynb` to `backups/<ID>_relevance_scoring_rerankers.ipynb`.
    3. **Setup cell**: re-create what earlier steps built (imports, `load_dotenv`, chunks, `vectorstore` connected to the existing index) so the workbench runs alone. Never re-upload unless the card says so.
-   4. **Build cells**, one per template TODO cell, in template order. First line of each: `# >>> PASTE INTO: Step <n> / <cell title>`.
-   5. **Check cells**: each prints `PASS` or `FAIL` and one reason, matching the template's "Done when".
-   6. **`%%writefile` cells**, only for plain files the card names (`requirements.txt`, `.gitignore`, `.env.example`, `lab_proof_draft.md`).
-   7. **Undo cell** (L3, L5, L6 only): restores the backup.
-4. Ayhan pastes the `PASTE INTO` cells into the matching TODO cells of the lab notebook. `%%writefile` never writes the notebook.
+   4. **Undo cell** (L3, L5, L6 only): restores the backup.
 5. Codex writes cells; Ayhan runs them.
-6. End with a short report: what was built, which cells go where, any risk.
+
 
 ## 6. Conventions
 - Keep the template's PROVIDED cells, variable and function names exactly: `all_chunks`, `podcast_chunks`, `act_chunks`, `embeddings`, `pc`, `index_name`, `vectorstore`, `TEST_QUERIES`, `show_results`, `baseline_search`, `baseline_results`, `llm`, `llm_relevance_score`, `llm_rerank`, `format_context`, `rag_prompt`, `answer`.
-- Build from the training notebooks, not from scratch: `rag_intro.ipynb` (embeddings, Pinecone, LCEL), `rag_pipeline.ipynb` (`rerank_documents` for Step 3, metadata filters), `rag_openai.ipynb` (upsert pattern).
 - Beginner-friendly: short code, `#` comments, a markdown cell above each block saying what and why.
 - Parameters: chunk 1000 / overlap 150, baseline `k=5`, Step 3 `k_initial=10`, `k_final=5`, `w_sim=0.3`, `w_llm=0.7`.
-- Upload with `ids=[c.metadata["chunk_id"] for c in all_chunks]` so a re-run overwrites instead of duplicating.
+- `app.py` reuses the notebook's function names, prompt and parameters; it only connects to the existing index.
 - Pinecone metadata values can't be `None`: leave the key out.
-- Step 5 metadata (v2): `section` (`recital` pages 1 to 43, `article` 44 to 123, `annex` 124 to 144; `transcript` for the podcast), `chapter`, `article` (e.g. `"Article 5"`), `annex`, podcast `char_start`.
-- RAG prompt: answer only from the context, cite `[source, p.X]` or `[source, chunk_id]`, otherwise say "I don't know based on the sources".
 - Manual evaluation cells (Step 7 table, "Stop and think") stay as `[Ayhan]` placeholders.
 - No em dashes in markdown.
 
@@ -86,3 +78,5 @@ lab-relevance-scoring-rerankers/
 - Never change PROVIDED template cells, parameters or names in §6.
 - Never add Cohere, sentence-transformers, new packages, features or files the card does not ask for.
 - Never fill in manual verdicts or invent scores, quotes or results.
+- Never create, delete or upload to the index from `app.py`; never use `share=True` or deploy.
+- Never add packages other than `gradio`.
